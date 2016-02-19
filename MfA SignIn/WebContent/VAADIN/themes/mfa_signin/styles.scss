@@ -1,0 +1,9 @@
+@import "addons.scss";
+@import "mfa_signin.scss";
+
+/* This file prefixes all rules with the theme name to avoid causing conflicts with other themes. */
+/* The actual styles should be defined in mfa_signin.scss */
+.mfa_signin {
+  @include addons;
+  @include mfa_signin;
+}
