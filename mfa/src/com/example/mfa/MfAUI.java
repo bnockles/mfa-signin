@@ -1,10 +1,16 @@
-package com.example.mfa_signin;
+package com.example.mfa;
+
+/**
+ * 
+ * @author bnockles
+ * @notes For documentation on salesforce API, see https://developer.salesforce.com/page/Database
+ */
 
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 
 import javax.servlet.annotation.WebServlet;
+
 
 import com.vaadin.annotations.Theme;
 import com.vaadin.annotations.VaadinServletConfiguration;
@@ -19,36 +25,31 @@ import com.vaadin.server.VaadinRequest;
 import com.vaadin.server.VaadinServlet;
 import com.vaadin.ui.Alignment;
 import com.vaadin.ui.Button;
+import com.vaadin.ui.DateField;
+import com.vaadin.ui.FormLayout;
+import com.vaadin.ui.HorizontalLayout;
+import com.vaadin.ui.Image;
 import com.vaadin.ui.Button.ClickEvent;
 import com.vaadin.ui.Button.ClickListener;
-import com.vaadin.ui.NativeSelect;
-import com.vaadin.ui.TextArea;
 import com.vaadin.ui.Window.CloseEvent;
-import com.vaadin.ui.Image;
+import com.vaadin.ui.Window.CloseListener;
 import com.vaadin.ui.Label;
+import com.vaadin.ui.NativeSelect;
 import com.vaadin.ui.Notification;
-import com.vaadin.ui.VerticalLayout;
-import com.vaadin.ui.HorizontalLayout;
-import com.vaadin.ui.DateField;
-import com.vaadin.ui.Window;
+import com.vaadin.ui.Table;
+import com.vaadin.ui.TextArea;
 import com.vaadin.ui.TextField;
 import com.vaadin.ui.UI;
-import com.vaadin.ui.FormLayout;
-import com.vaadin.ui.Table;
-import com.vaadin.ui.Window.CloseListener;
-
-/**
- * 
- * @author bnockles
- * @notes For documentation on salesforce API, see https://developer.salesforce.com/page/Database
- */
+import com.vaadin.ui.VerticalLayout;
+import com.vaadin.ui.Window;
 
 @SuppressWarnings("serial")
-@Theme("console_demo")
-public class Mfa_signinUI extends UI {
+@Theme("mfa")
+public class MfAUI extends UI {
 
 	@WebServlet(value = "/*", asyncSupported = true)
-	@VaadinServletConfiguration(productionMode = false, ui = Mfa_signinUI.class)
+	@VaadinServletConfiguration(productionMode = false, ui = MfAUI.class)
+
 	public static class Servlet extends VaadinServlet {
 	}
 
@@ -129,20 +130,20 @@ public class Mfa_signinUI extends UI {
 		table.setSelectable(true);
 		table.setColumnReorderingAllowed(true);
 		table.setSortEnabled(true);
-		table.setSortContainerPropertyId("memberSince");
+		table.setSortContainerPropertyId("cohort");
 		table.setColumnCollapsingAllowed(true);
-		table.setColumnHeader("osis", "OSIS #");
+//		table.setColumnHeader("id", "ID #");
 		table.setColumnHeader("date", "Date");
-		table.setColumnHeader("memberSince", "Member Since");
-		table.setColumnHeader("game", "PD");
-		table.setColumnHeader("student", "Name");
+		table.setColumnHeader("cohort", "Cohort");
+		table.setColumnHeader("pd", "PD");
+		table.setColumnHeader("teacher", "Name");
 		table.setColumnHeader("firstName", "First Name");
 		table.setColumnHeader("lastName", "Last Name");
 		
 		try{
 			table.setColumnCollapsed("date", true);
-			table.setColumnCollapsed("memberSince", true);
-			table.setColumnCollapsed("osis", true);
+			table.setColumnCollapsed("cohort", true);
+//			table.setColumnCollapsed("id", true);
 			table.setColumnCollapsed("firstName", true);
 			table.setColumnCollapsed("lastName", true);
 		}catch(IllegalStateException e){
@@ -262,7 +263,7 @@ public class Mfa_signinUI extends UI {
 		date = new DateField();
 		date.setWidth("100%");
 		date.setValue(new Date());
-		Button startSignIn = new Button("Start Signing In Club Members");
+		Button startSignIn = new Button("Start Collecting Attendance");
 		startSignIn.addClickListener(new ClickListener() {
 			private static final long serialVersionUID = -73154695046517200L;
 

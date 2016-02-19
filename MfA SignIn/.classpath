@@ -20,5 +20,11 @@
 	</classpathentry>
 	<classpathentry kind="con" path="org.apache.ivyde.eclipse.cpcontainer.IVYDE_CONTAINER/?project=MfA+SignIn&amp;ivyXmlPath=ivy.xml&amp;confs=widgetset-compile&amp;ivySettingsPath=%24%7Bworkspace_loc%3AMfA+SignIn%2Fivysettings.xml%7D&amp;loadSettingsOnDemand=false&amp;ivyUserDir=&amp;propertyFiles="/>
 	<classpathentry kind="con" path="org.apache.ivyde.eclipse.cpcontainer.IVYDE_CONTAINER/?project=MfA+SignIn&amp;ivyXmlPath=ivy.xml&amp;confs=nodeploy&amp;ivySettingsPath=%24%7Bworkspace_loc%3AMfA+SignIn%2Fivysettings.xml%7D&amp;loadSettingsOnDemand=false&amp;ivyUserDir=&amp;propertyFiles="/>
-	<classpathentry kind="output" path="build/classes"/>
+	<classpathentry kind="lib" path="/Users/bnockles/Documents/workspace/NewProject/war/WEB-INF/lib/vaadin-server-7.0.0.jar"/>
+	<classpathentry kind="lib" path="/Users/bnockles/.ivy2/cache/com.vaadin/vaadin-server/jars/vaadin-server-7.4.0.jar" rootpath="/Users/bnockles/.ivy2/cache/com.vaadin/vaadin-server/sources/vaadin-server-7.4.0-sources.jar" sourcepath="/Users/bnockles/.ivy2/cache/com.vaadin/vaadin-server/sources/vaadin-server-7.4.0-sources.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:file:/Users/bnockles/.ivy2/cache/com.vaadin/vaadin-server/javadocs/vaadin-server-7.4.0-javadoc.jar!/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="output" path="WebContent/WEB-INF/classes"/>
 </classpath>
