@@ -13,13 +13,11 @@ public class Teacher implements Serializable{
 	static final long serialVersionUID = -236332262349791525L;
 	String lastName;
     String firstName;
-    long id;
     int cohort;
     
-    public Teacher(String ln,String fn, long id, int cohort){
+    public Teacher(String ln,String fn, int cohort){
         lastName = ln;
         firstName = fn;
-        this.id=id;
         this.cohort=cohort;
     }
 
@@ -31,9 +29,6 @@ public class Teacher implements Serializable{
 		return firstName;
 	}
 
-	public long getIdentifier() {
-		return id;
-	}
     
 	public int getCohort(){
 		return cohort;

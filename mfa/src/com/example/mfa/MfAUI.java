@@ -16,6 +16,7 @@ import com.vaadin.annotations.Theme;
 import com.vaadin.annotations.VaadinServletConfiguration;
 import com.vaadin.data.Property.ValueChangeEvent;
 import com.vaadin.data.Property.ValueChangeListener;
+import com.vaadin.data.util.BeanItem;
 import com.vaadin.data.util.BeanItemContainer;
 import com.vaadin.data.validator.RegexpValidator;
 import com.vaadin.server.Page;
@@ -23,6 +24,7 @@ import com.vaadin.server.Resource;
 import com.vaadin.server.ThemeResource;
 import com.vaadin.server.VaadinRequest;
 import com.vaadin.server.VaadinServlet;
+import com.vaadin.ui.AbstractSelect.ItemCaptionMode;
 import com.vaadin.ui.Alignment;
 import com.vaadin.ui.Button;
 import com.vaadin.ui.DateField;
@@ -56,14 +58,15 @@ public class MfAUI extends UI {
 	//components
 	Window dateWindow;
 	Window nameWindow;
-	Window pdWindow;
 	FormLayout editForm;
 	HorizontalLayout layout;
+	
+	NativeSelect pdSelect;
+	
 	VerticalLayout nameLayout;
 	NativeSelect name;
 	Button addName;
-	Button addPD;
-	NativeSelect game;
+
 	Button enter;
 	Label selectedEntry;
 	Button deleteEntry;
@@ -72,9 +75,9 @@ public class MfAUI extends UI {
 	Button export;
 
 	//values
-	BeanItemContainer<Teacher> roster = new BeanItemContainer<Teacher>(Teacher.class);
 	BeanItemContainer<PD> pds = new BeanItemContainer<PD>(PD.class);
-	BeanItemContainer<LogEntry> entries = new BeanItemContainer<LogEntry>(LogEntry.class);
+	AttendanceFile attendanceRecords;
+	//TODO Currently loading the sample attendance file. Load from fil once parse function is done
 	Table table;
 	int entryIndex=1;
 
@@ -84,7 +87,6 @@ public class MfAUI extends UI {
 		setLayout();
 		setDateSelection();
 		setNameEntry();
-		setPDEntry();
 
 		// Open it in the UI
 		addWindow(dateWindow);
@@ -92,39 +94,20 @@ public class MfAUI extends UI {
 
 	private void setRosterAndPDDefaults(){
 
-		Teacher t0 = new Teacher("Nockles","Benjamin",0000000000000000,2012);
-		Teacher t1 = new Teacher("Lang","Jason",0000000000000001, 2012);
-		Teacher t2 = new Teacher("Honner","Patring",0000000000000002, 2013);
-		Teacher t3 = new Teacher("Shuman","Doug",0000000000000003, 2013);
-		Teacher t4 = new Teacher("Nisani","Daniel",0000000000000004, 2014);
-		
-		roster.addItem(t0);
-		roster.addItem(t1);
-		roster.addItem(t2);
-		roster.addItem(t3);
-		roster.addItem(t4);
+		attendanceRecords= new AttendanceFile();
 
-		//TODO: USe salesforce IDE to retrieve scheduled PD for date of this attendance form
-		ArrayList<Teacher> geoParticipants = new ArrayList<Teacher>();
-		geoParticipants.add(t0);
-		geoParticipants.add(t2);
-		geoParticipants.add(t4);
 		
-		Date today = new Date();
+		for(PD a: attendanceRecords.getPDs()){
+			pds.addItem(a);
+		}
 		
-		ArrayList<Teacher> a2Participants = new ArrayList<Teacher>();
-		geoParticipants.add(t1);
-		geoParticipants.add(t3);
-		
-		pds.addItem(new PD("The Story of Geometry", geoParticipants, today));
-		pds.addItem(new PD("I teach algebra too!", a2Participants, today));
-
 
 	}
 
 
+	//Constructs a table that is not visible to attendees but can be viewed in administrator tools
 	private void prepareTable(){
-		table = new Table("Tabletop Club, "+(new Date()),entries);
+		table = new Table("Tabletop Club, "+(new Date()),attendanceRecords.getRecords());
 		table.setWidth("90%");
 		table.setImmediate(true);
 		table.setSelectable(true);
@@ -158,37 +141,30 @@ public class MfAUI extends UI {
 		VerticalLayout m = new VerticalLayout();
 		layout = new HorizontalLayout();
 		layout.setWidth("70%");
+		VerticalLayout pdLayout= new VerticalLayout();
+		pdLayout.setSpacing(true);
+		pdSelect = new NativeSelect("Which PD are you participating in today?",pds);
+		pdSelect.setWidth("100%");
+		pdSelect.setNullSelectionAllowed(false);
+		pdLayout.addComponent(pdSelect);
+		pdLayout.setComponentAlignment(pdSelect, Alignment.MIDDLE_CENTER);
+		layout.addComponent(pdLayout);
+
 		nameLayout = new VerticalLayout();
 		nameLayout.setSpacing(true);
-		name = new NativeSelect("Select Name",roster);
-		name.setWidth("100%");
 		addName=new Button("Add a new name");
-		nameLayout.addComponent(name);
-		nameLayout.addComponent(addName);
-		nameLayout.setComponentAlignment(name, Alignment.MIDDLE_CENTER);
-		nameLayout.setComponentAlignment(addName, Alignment.MIDDLE_LEFT);
+
 		layout.addComponent(nameLayout);
 
-		VerticalLayout gameLayout= new VerticalLayout();
-		gameLayout.setSpacing(true);
-		addPD = new Button("Add a new PD");
-		game = new NativeSelect("Which PD are you participating in today?",pds);
-		game.setWidth("100%");
-		game.setNullSelectionAllowed(false);
-		gameLayout.addComponent(game);
-		gameLayout.addComponent(addPD);
-		gameLayout.setComponentAlignment(game, Alignment.MIDDLE_CENTER);
-		gameLayout.setComponentAlignment(addPD, Alignment.MIDDLE_LEFT);
 
-		layout.addComponent(gameLayout);
 		enter=new Button("Sign In");
 		enter.setWidth("60%");
 		layout.addComponent(enter);
 		layout.setComponentAlignment(nameLayout, Alignment.MIDDLE_CENTER);
-		layout.setComponentAlignment(gameLayout, Alignment.MIDDLE_CENTER);
+		layout.setComponentAlignment(pdLayout, Alignment.MIDDLE_CENTER);
 		layout.setComponentAlignment(enter, Alignment.MIDDLE_CENTER);
 		layout.setSpacing(true);
-		Resource res = new ThemeResource("images/shadowsLogo.jpg");
+		Resource res = new ThemeResource("images/MfA.jpeg");
 		Image graphic = new Image(null, res);
 		graphic.setHeight("200px");
 		m.addComponent(graphic);
@@ -203,7 +179,7 @@ public class MfAUI extends UI {
 		editForm.setCaption("Edit Entry");
 		editForm.setVisible(false);
 		selectedEntry=new Label("");
-		deleteEntry = new Button("Delete this entry");
+		deleteEntry = new Button("Mark person absent");
 		cancelEdit = new Button("Cancel");
 		editForm.addComponent(selectedEntry);
 		editForm.addComponent(deleteEntry);
@@ -213,7 +189,7 @@ public class MfAUI extends UI {
 			public void buttonClick(Button.ClickEvent event) {
 				String content ="Date,Last Name,FirstName,ID,Cohort,PD,\n";
 				for(Object l:table.getItemIds()){
-					LogEntry e = (LogEntry)l;
+					AttendanceRecord e = (AttendanceRecord)l;
 					content+=e.getDate()+","+e.getLastName()+","+e.getFirstName()+","+e.getID()+","+e.getCohort()+","+e.getPD()+",\n";
 				}
 				Window csv = new Window(table.getCaption());
@@ -270,7 +246,7 @@ public class MfAUI extends UI {
 			@Override
 			public void buttonClick(ClickEvent event) {
 				dateWindow.close();
-				table.setCaption("Tabletop Club,"+date.getValue());
+				table.setCaption("MfA Professional Development, "+date.getValue());
 			}
 		});
 		subContent.addComponent(dateSelect);
@@ -294,12 +270,9 @@ public class MfAUI extends UI {
 		lastName.addValidator(new RegexpValidator("[a-zA-Z \\-]+", "Please enter your last name."));
 		final TextField firstName = new TextField("First Name");
 		firstName.addValidator(new RegexpValidator("[a-zA-Z \\-]+", "Please enter your first name."));
-		final TextField id= new TextField("ID #");
-		id.addValidator(new RegexpValidator("[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]", "This is not a valid ID # (must be nine digits)"));
 		final TextField cohort= new TextField("Cohort");
 		cohort.addValidator(new RegexpValidator("2[0-9][0-9][0-9]", "This is not a valid cohort year"));
 		
-		id.setImmediate(true);
 		cohort.setImmediate(true);
 		
 		final Button add = new Button("Add");
@@ -311,21 +284,21 @@ public class MfAUI extends UI {
 			public void buttonClick(final ClickEvent event) {
 				try{
 					cohort.validate();
-					id.validate();
 					lastName.validate();
 					firstName.validate();
-					long newOsis = Long.parseLong(id.getValue());
 					int year = Integer.parseInt(cohort.getValue());
 					boolean alreadyCreated = false;
-					for(Teacher s:roster.getItemIds()){
-						if(s.getIdentifier()==newOsis){
+					BeanItemContainer<AttendanceRecord> roster = ((PD)pdSelect.getValue()).getAttendanceRecords();
+					for(AttendanceRecord a:roster.getItemIds()){
+						if(a.getFirstName().equalsIgnoreCase(firstName.getValue()) && a.getLastName().equalsIgnoreCase(lastName.getValue())){
 							alreadyCreated=true;
 							break;
 						}
 					}
 					if(!alreadyCreated){
-						Teacher created = new Teacher(lastName.getValue(), firstName.getValue(), newOsis,year);
-						roster.addBean(created);
+						Teacher created = new Teacher(lastName.getValue(), firstName.getValue(),year);
+						AttendanceRecord tempRecord = new AttendanceRecord(created, (PD)pdSelect.getValue(), "UNREGISTERED", AttendanceRecord.ATTENDED, new Date());
+						roster.addBean(tempRecord);
 						name.select(created);
 						nameWindow.close();
 					}else{
@@ -334,7 +307,7 @@ public class MfAUI extends UI {
 						alreadyEntered.show(Page.getCurrent());
 					}
 				}catch(Exception e){
-					Notification alreadyEntered = new Notification("Please enter valid first name, last name, and osis number.");
+					Notification alreadyEntered = new Notification("Please enter valid first name, last name, and cohort.");
 					alreadyEntered.setStyleName("error");
 					alreadyEntered.show(Page.getCurrent());
 					add.setEnabled(true);
@@ -345,7 +318,6 @@ public class MfAUI extends UI {
 		subContent.addComponent(firstName);
 		subContent.addComponent(lastName);
 		subContent.addComponent(cohort);
-		subContent.addComponent(id);
 		subContent.addComponent(add);
 		subContent.setComponentAlignment(add, Alignment.MIDDLE_CENTER);
 		nameWindow.center();
@@ -355,56 +327,12 @@ public class MfAUI extends UI {
 			public void windowClose(CloseEvent e) {
 				lastName.setValue("");
 				firstName.setValue("");
-				id.setValue("");
 				cohort.setValue("");
 				add.setEnabled(true);
 			}
 		});
 	}
 
-	private void setPDEntry(){
-		pdWindow = new Window("Add a new PD for today. (with no registered attendees)");
-		FormLayout subContent = new FormLayout();
-		subContent.setMargin(true);
-		pdWindow.setContent(subContent);
-		pdWindow.setWidth("40%");
-
-		// Put some components in it
-		final TextField gameTitle = new TextField("PD Title");
-		gameTitle.setWidth("90%");
-		Button add = new Button("Add");
-		add.setWidth("50%");
-		add.addClickListener(new ClickListener(){
-			private static final long serialVersionUID = -73154694083517200L;
-
-			public void buttonClick(final ClickEvent event) {
-				String newTitle = gameTitle.getValue();
-				boolean distinct = true;
-				for(PD g:pds.getItemIds()){
-					if(g.getTitle().equals(newTitle)){
-						distinct=false;
-						break;
-					}
-				}
-				if(distinct){
-					PD created = new PD(newTitle, new ArrayList<Teacher>(), new Date());
-					pds.addBean(created);
-					game.select(created);
-					pdWindow.close();
-				}else{
-					Notification alreadyEntered = new Notification("PD Already Listed");
-					alreadyEntered.setStyleName("error");
-					alreadyEntered.show(Page.getCurrent());
-				}
-			}
-		});
-
-		subContent.addComponent(gameTitle);
-		subContent.addComponent(add);
-		subContent.setComponentAlignment(add, Alignment.MIDDLE_CENTER);
-		
-		pdWindow.center();
-	}
 
 	public void addListeners(){
 		addName.addClickListener(new ClickListener(){
@@ -414,44 +342,57 @@ public class MfAUI extends UI {
 				addWindow(nameWindow);
 			}
 		});
-		addPD.addClickListener(new ClickListener(){
-			private static final long serialVersionUID = -73954695186177200L;
 
-			public void buttonClick(final ClickEvent event) {
-				addWindow(pdWindow);
+		pdSelect.addValueChangeListener(new ValueChangeListener() {
+			
+			@Override
+			public void valueChange(ValueChangeEvent event) {
+				nameLayout.removeAllComponents();
+				name = new NativeSelect("Select Name",((PD)pdSelect.getValue()).getAttendanceRecords());
+				name.setItemCaptionMode(ItemCaptionMode.PROPERTY);
+				name.setItemCaptionPropertyId("teacher");
+				name.setWidth("100%");
+				nameLayout.addComponent(name);
+				nameLayout.addComponent(addName);
+				nameLayout.setComponentAlignment(name, Alignment.MIDDLE_CENTER);
+				nameLayout.setComponentAlignment(addName, Alignment.MIDDLE_LEFT);
 			}
 		});
+		
 		enter.addClickListener(new ClickListener(){
 			private static final long serialVersionUID = -73954695086217200L;
 
 			public void buttonClick(final ClickEvent event) {
-				if(name.getValue()!=null){
-					if(game.getValue()!=null){
-						boolean distinct=true;
+				if(pdSelect.getValue()!=null){
+					if(name.getValue()!=null){
 						for(Object l:table.getItemIds()){
-							LogEntry le = (LogEntry)l;
-							if(le.matches((Teacher)(name.getValue()))){
-								distinct = false;
-								break;
+							AttendanceRecord le = (AttendanceRecord)l;
+							if(le.equals((AttendanceRecord)(name.getValue()))){
+								if(le.getStatus().equals(AttendanceRecord.ATTENDED)){
+									Notification duplicate = new Notification("Already Checked In","Either you are someone else has already logged in today.");
+									duplicate.setStyleName("error");
+									duplicate.setDelayMsec(3000);
+									duplicate.show(Page.getCurrent());
+									break;
+								}else{
+									le.setStatus(AttendanceRecord.ATTENDED);
+									table.commit();
+									Notification success = new Notification("Success!","You are checked in for "+le.getPD().getTitle()+".");
+//									success.setStyleName("error");
+									success.setDelayMsec(3000);
+									success.show(Page.getCurrent());
+									table.refreshRowCache();
+								}
 							}
 						}
-						if(!distinct){
-							Notification duplicate = new Notification("Duplicate Entry.","A teacher with this ID # has already logged in today.");
-							duplicate.setStyleName("error");
-							duplicate.show(Page.getCurrent());
-						}else{
-							entries.addItem(new LogEntry(date.getValue(), (Teacher)name.getValue(), (PD)game.getValue()));
-							table.commit();
-							entryIndex++;
-						}
 					}else{
-						Notification selectPD = new Notification("Please select a game.","If your game is not listed, please add it by clicking the 'Add new game' button.");
+						Notification selectPD = new Notification("Please select your name.","If your name is not listed, please add it by clicking the 'Add Name' button.");
 						selectPD.setStyleName("error");
 						selectPD.show(Page.getCurrent());
 					}
 				}else{
 
-					Notification selectName = new Notification("Please select your name.","If your name is not listed, please add it by clicking the 'Add new name' button.");
+					Notification selectName = new Notification("Please select a PD.","If your PD is not listed, talk to someone at the front desk.");
 					selectName.setStyleName("error");
 					selectName.show(Page.getCurrent());
 				}
@@ -462,8 +403,13 @@ public class MfAUI extends UI {
 
 			@Override
 			public void buttonClick(ClickEvent event) {
-				entries.removeItem(table.getValue());
+				((AttendanceRecord)table.getValue()).setStatus(AttendanceRecord.ABSENT);
 				table.commit();
+				table.refreshRowCache();
+				Teacher marked = ((AttendanceRecord)table.getValue()).getTeacher();
+				Notification absent = new Notification(marked.getFirstName()+" "+marked.getLastName(),"...has been marked absent.");
+				absent.setDelayMsec(3000);
+				absent.show(Page.getCurrent());
 				editForm.setVisible(false);
 			}
 		});
@@ -483,8 +429,10 @@ public class MfAUI extends UI {
 					editForm.setVisible(false);
 					return;
 				}
-				LogEntry selected = (LogEntry)table.getValue();
+				AttendanceRecord selected = (AttendanceRecord)table.getValue();
 				selectedEntry.setValue(selected.getTeacher()+" participating in "+selected.getPD());
+				if(((AttendanceRecord)table.getValue()).getStatus().equals(AttendanceRecord.ABSENT))deleteEntry.setEnabled(false);
+				else deleteEntry.setEnabled(true);
 				editForm.setVisible(true);
 
 			}
