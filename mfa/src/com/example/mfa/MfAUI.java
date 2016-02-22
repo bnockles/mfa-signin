@@ -745,7 +745,7 @@ public class MfAUI extends UI {
 		l.setMargin(true);
 		final HorizontalLayout buttonRow = new HorizontalLayout();
 		explainAbsence.setContent(l);
-		final TextArea disclaimer = new TextArea("Looks like you missed a session!","You have been checked in for this evening's PD but our records show you have missed a previous PD in this series.");
+		final TextArea disclaimer = new TextArea("Looks like you missed a session!","You have been checked in for this evening's PD but our records show you have missed a previous PD in this series. The PD was on "+format.format(date)+".");
 		disclaimer.setWidth("100%");
 		disclaimer.setReadOnly(true);
 		
