@@ -326,7 +326,7 @@ public class MfAUI extends UI {
 		viewButtons.addComponent(genCsv);
 		viewButtons.addComponent(viewNotes);
 		viewButtons.addComponent(cancelPD);
-		
+		viewButtons.setSpacing(true);
 		reviewData.addComponent(viewButtons);
 		reviewData.setComponentAlignment(viewButtons, Alignment.MIDDLE_CENTER);
 		
@@ -379,6 +379,7 @@ public class MfAUI extends UI {
 		statuses.add(AttendanceRecord.EXCUSED);
 		changeEntry = new NativeSelect("Mark person as",statuses);
 		cancelPD = new Button("Cancel PD");
+		changeEntry.setNullSelectionAllowed(false);
 		
 		addListeners();
 	}
