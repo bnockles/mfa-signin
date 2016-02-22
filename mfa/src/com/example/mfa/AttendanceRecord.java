@@ -11,7 +11,6 @@ public class AttendanceRecord implements Serializable{
 	 * 
 	 */
 	private static final long serialVersionUID = 4690838271263352606L;
-	Date date;
 	Teacher teacher;
 	PD pd;
 	String teacherName;
@@ -82,7 +81,7 @@ public class AttendanceRecord implements Serializable{
 
 	public void setStatus(String status) {
 		this.status = status;
-		
+		this.time=new Date();
 	}
 	
 	
