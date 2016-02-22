@@ -38,5 +38,17 @@ public class Teacher implements Serializable{
 	public String toString(){
 		return firstName + " " + lastName;
 	}
+
+	public String getName() {
+		return firstName+ " "+lastName;
+	}
+	
+	public boolean equals(Object t){
+		if(t instanceof Teacher){
+			if(((Teacher)t).getName().equals(getName()))return true;
+		}
+		return false;
+		
+	}
     
 }

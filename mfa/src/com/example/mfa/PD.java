@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Iterator;
 
 import com.vaadin.data.util.BeanItemContainer;
 
@@ -16,19 +17,8 @@ public class PD implements Serializable {
 	int workshopNumber;
 	BeanItemContainer<AttendanceRecord> attendeeRecords = new BeanItemContainer<AttendanceRecord>(AttendanceRecord.class);
 	Date date;
+	String location;
 	
-	/**
-	 * constructor for single session PDs
-	 * @param name Name of the PD
-	 * @param records list of records
-	 * @param date date and time of PD
-	 */
-	public PD(String name, BeanItemContainer<AttendanceRecord> records, Date date){
-		title = name;
-		this.attendeeRecords=records;
-		this.date = date;
-		workshopNumber = 1;
-	}
 	
 	/**
 	 * constructor for single multi-session PDs
@@ -37,11 +27,12 @@ public class PD implements Serializable {
 	 * @param records
 	 * @param date
 	 */
-	public PD(String name, int number, BeanItemContainer<AttendanceRecord> records, Date date){
+	public PD(String name, int number, BeanItemContainer<AttendanceRecord> records, Date date, String location){
 		title = name;
 		this.attendeeRecords=records;
 		this.date = date;
 		workshopNumber = number;
+		this.location = location;
 	}
 
 	public String getTitle() {
@@ -77,5 +68,19 @@ public class PD implements Serializable {
 	public boolean equals(Object record2) {
 		if(record2 instanceof PD && ((PD) record2).getTitle().equals(title) && ((PD) record2).getWorkshop() == workshopNumber)return true;
 		else return false;
+	}
+
+	public String getLocation() {
+		return location;
+	}
+
+	public void cancel() {
+		for (Iterator<AttendanceRecord> i = attendeeRecords.getItemIds().iterator(); i.hasNext();) {
+		    // Get the current item identifier, which is an integer.
+			AttendanceRecord iid = (AttendanceRecord) i.next();
+		    
+		    iid.setStatus(AttendanceRecord.CANCELLED);
+	
+		}
 	}
 }

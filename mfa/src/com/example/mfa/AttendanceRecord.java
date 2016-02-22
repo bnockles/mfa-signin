@@ -22,6 +22,8 @@ public class AttendanceRecord implements Serializable{
 	
 	public static final String ATTENDED= "Attended";
 	public static final String ABSENT= "Absent";
+	public static final String EXCUSED= "Excused";
+	public static final String CANCELLED= "Cancelled";
 	
 	
 	public AttendanceRecord(Teacher t, PD p, String id, String status, Date time){
