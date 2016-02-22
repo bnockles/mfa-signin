@@ -168,7 +168,7 @@ public class MfAUI extends UI {
 		layout.setWidth("70%");
 		VerticalLayout pdLayout= new VerticalLayout();
 		pdLayout.setSpacing(true);
-		pdSelect = new NativeSelect("Which PD are you participating in today?",pds);
+		pdSelect = new NativeSelect("Select PD",pds);
 		pdSelect.setWidth("100%");
 		pdSelect.setNullSelectionAllowed(false);
 		pdLayout.addComponent(pdSelect);
@@ -386,10 +386,22 @@ public class MfAUI extends UI {
 
 	private void setFileSelection(){
 		fileSelectWindow = new Window("Create a new sign in sheet.");
+		VerticalLayout fields = new VerticalLayout();
 		HorizontalLayout subContent = new HorizontalLayout();
 		subContent.setMargin(true);
 		subContent.setSpacing(true);
-		fileSelectWindow.setContent(subContent);
+		
+		PasswordField pass = new PasswordField("Enter an admin password");
+		pass.setWidth("100%")
+		HorizontalLayout passContent = new HorizontalLayout();
+		passContent.setMargin(true);
+		passContent.setSpacing(true);
+		passContent.addComponent(pass);
+		
+		fields.addComponent(passContent);
+		fields.addComponent(subContent);
+		fileSelectWindow.setContent(fields);
+		
 
 		fileNameEntry = new TextField("Select a file from which to load attendance records.", "demo-record.csv");
 		fileNameEntry.setWidth("100%");
@@ -400,17 +412,24 @@ public class MfAUI extends UI {
 			@Override
 			public void buttonClick(ClickEvent event) {
 				fileSelectWindow.close();
-				try{
-					attendanceRecords = new AttendanceFile(fileNameEntry.getValue());
-					promptLocation(attendanceRecords.getLocations());
+				if(group.isAdmin(pass.getValue()){
+					try{
+						attendanceRecords = new AttendanceFile(fileNameEntry.getValue());
+						promptLocation(attendanceRecords.getLocations());
 				
 
-				}catch(Exception e){
-					Notification noFileError= new Notification("Empty/Non-Existent file","Reload this page and try again.");
-					noFileError.setStyleName("error");
-					noFileError.setDelayMsec(3000);
-					noFileError.show(Page.getCurrent());
-				}	
+					}catch(Exception e){
+						Notification noFileError= new Notification("Empty/Non-Existent file","Reload this page and try again.");
+						noFileError.setStyleName("error");
+						noFileError.setDelayMsec(3000);
+						noFileError.show(Page.getCurrent());
+					}
+				}else{
+					Notification noPassError= new Notification("Invalid Password","Reload this page and try again.");
+					noPassError.setStyleName("error");
+					noPassError.setDelayMsec(3000);
+					noPassError.show(Page.getCurrent());	
+				}
 			}
 		});
 		subContent.addComponent(fileNameEntry);
