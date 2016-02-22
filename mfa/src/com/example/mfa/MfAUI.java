@@ -391,8 +391,8 @@ public class MfAUI extends UI {
 		subContent.setMargin(true);
 		subContent.setSpacing(true);
 		
-		PasswordField pass = new PasswordField("Enter an admin password");
-		pass.setWidth("100%")
+		final PasswordField pass = new PasswordField("Enter an admin password");
+		pass.setWidth("100%");
 		HorizontalLayout passContent = new HorizontalLayout();
 		passContent.setMargin(true);
 		passContent.setSpacing(true);
@@ -412,7 +412,7 @@ public class MfAUI extends UI {
 			@Override
 			public void buttonClick(ClickEvent event) {
 				fileSelectWindow.close();
-				if(group.isAdmin(pass.getValue()){
+				if(group.isValidPassword(pass.getValue())){
 					try{
 						attendanceRecords = new AttendanceFile(fileNameEntry.getValue());
 						promptLocation(attendanceRecords.getLocations());
