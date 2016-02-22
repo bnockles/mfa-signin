@@ -14,7 +14,6 @@ import java.util.Iterator;
 
 import javax.servlet.annotation.WebServlet;
 
-
 import com.vaadin.annotations.Theme;
 import com.vaadin.annotations.VaadinServletConfiguration;
 import com.vaadin.data.Property.ValueChangeEvent;
@@ -83,6 +82,7 @@ public class MfAUI extends UI {
 	//admin functions
 	AdminGroup group;
 	Button admin;
+	private String enteredPassword;
 	boolean adminVisible;
 	VerticalLayout adminLayout;
 	ArrayList<Note> notes;
@@ -100,6 +100,7 @@ public class MfAUI extends UI {
 		pds = new BeanItemContainer<PD>(PD.class);
 
 		group = new AdminGroup();
+		enteredPassword="";
 		
 		setLayout();
 		setFileSelection();
@@ -241,8 +242,10 @@ public class MfAUI extends UI {
 	private void adminEntry(String password){
 		if(group.isValidPassword(password)){
 			finishAdminLayout();
+			enteredPassword=password;
 		}else{
 			Notification change = new Notification("Incorrect Password","A correct password is required for administrative privilages.");
+			enteredPassword="";
 			change.setStyleName("error");
 			change.setDelayMsec(3000);
 			change.show(Page.getCurrent());
@@ -272,10 +275,10 @@ public class MfAUI extends UI {
 		reviewData.setComponentAlignment(editForm, Alignment.MIDDLE_CENTER);
 		Button genCsv = new Button("Generate CSV",new Button.ClickListener() {
 			public void buttonClick(Button.ClickEvent event) {
-				String content ="Date,Last Name,FirstName,ID,Cohort,PD,\n";
+				String content ="Date,Last Name,FirstName,Record ID,Cohort,PD,Status,\n";
 				for(Object l:table.getItemIds()){
 					AttendanceRecord e = (AttendanceRecord)l;
-					content+=e.getDate()+","+e.getLastName()+","+e.getFirstName()+","+e.getID()+","+e.getCohort()+","+e.getPD()+",\n";
+					content+=e.getDate()+","+e.getLastName()+","+e.getFirstName()+","+e.getID()+","+e.getCohort()+","+e.getPD()+","+e.getStatus()+",\n";
 				}
 				Window csv = new Window(table.getCaption());
 				csv.setWidth("90%");
@@ -650,7 +653,7 @@ public class MfAUI extends UI {
 					change.setDelayMsec(3000);
 					change.show(Page.getCurrent());
 					editForm.setVisible(false);
-					notes.add(new Note(marked.getName()+" was marked "+value+ " by an administrator.",new Date()));
+					notes.add(new Note(marked.getName()+" was marked "+value+ " by "+group.getAdmin(enteredPassword)+".",new Date()));
 				}
 			}
 		});
@@ -662,10 +665,15 @@ public class MfAUI extends UI {
 				
 				adminLayout.setVisible(!adminVisible);
 				adminVisible=!adminVisible;
-				if(adminVisible)prepAdminLayout();
-				if(adminVisible)admin.setCaption("Hide Admin Data");
-				else admin.setCaption("View Admin Data");
+				if(adminVisible){
+					prepAdminLayout();
+					admin.setCaption("Hide Admin Data");
+				}else{
+					admin.setCaption("View Admin Data");
+					enteredPassword="";
+				}
 			}
+			
 		});
 		cancelPD.addClickListener(new ClickListener() {
 			
