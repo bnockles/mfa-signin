@@ -92,8 +92,8 @@ public class AttendanceRecord implements Serializable{
 	public void setStatus(String status) {
 		this.status = status;
 		Calendar cal = Calendar.getInstance();
-		cal.add(Calendar.HOUR, -5);
-		this.time=cal.getTime();
+//		cal.add(Calendar.HOUR, -5);
+		if(this.status.equals(ATTENDED))this.time=cal.getTime();
 		if(!file.save()){
 			Notification saveError = new Notification("Saving Error","The attendance records have not been saved");
 			saveError.setStyleName("error");

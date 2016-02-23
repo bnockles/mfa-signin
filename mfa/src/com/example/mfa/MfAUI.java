@@ -9,6 +9,7 @@ import java.text.SimpleDateFormat;
  */
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.Iterator;
 
@@ -86,6 +87,7 @@ public class MfAUI extends UI {
 	boolean adminVisible;
 	VerticalLayout adminLayout;
 	ArrayList<Note> notes;
+	String location;
 	
 	
 	//values
@@ -275,10 +277,10 @@ public class MfAUI extends UI {
 		reviewData.setComponentAlignment(editForm, Alignment.MIDDLE_CENTER);
 		Button genCsv = new Button("Generate CSV",new Button.ClickListener() {
 			public void buttonClick(Button.ClickEvent event) {
-				String content ="Date,Last Name,FirstName,Record ID,Cohort,PD,Status,\n";
+				String content ="FirstName,Last Name,Record ID,Date,PD,Workshop,Location,Status,Timestamp,\n";
 				for(Object l:table.getItemIds()){
 					AttendanceRecord e = (AttendanceRecord)l;
-					content+=e.getDate()+","+e.getLastName()+","+e.getFirstName()+","+e.getID()+","+e.getCohort()+","+e.getPD()+","+e.getStatus()+",\n";
+					content+="\""+e.getFirstName()+"\",\""+e.getLastName()+"\",\""+e.getID()+"\",\""+e.getPD().getDateString()+"\",\""+e.getPD().getTitle()+"\",\"Workshop "+e.getPD().getWorkshop()+"\",\""+e.getPD().getLocation()+"\",\""+e.getStatus()+","+e.getTime()+"\n";
 				}
 				Window csv = new Window(table.getCaption());
 				csv.setWidth("90%");
@@ -306,6 +308,9 @@ public class MfAUI extends UI {
 					addedANote = true;
 				}
 				if(!addedANote)content+="There are no special notes about attendance tonight.";
+				
+				content+=addAttendanceReport();
+				
 				Window notes = new Window(table.getCaption());
 				notes.setWidth("70%");
 				notes.setHeight("90%");
@@ -333,6 +338,68 @@ public class MfAUI extends UI {
 		adminLayout.addComponent(reviewData);
 	}
 	
+	private String addAttendanceReport() {
+		String content = "\n\n     ATTENDANCE REPORT FOR: "+location+"\n";
+		
+		int total = attendanceRecords.getRecords().size();
+		int inAttendance=0;
+		int numberOver30MinEarly=0;
+		int numberOver15MinEarly=0;
+		int numberWithin15MinEarly=0;
+		int numberWithin15MinLate=0;
+		int numberWithin30MinLate=0;
+		int numberBeyond30MinLate=0;
+		ArrayList<String> late15To30Arrivals = new ArrayList<String>();
+		ArrayList<String> lateBeyond30Arrivals = new ArrayList<String>();
+		
+		for(Iterator<AttendanceRecord> i = attendanceRecords.getRecords().getItemIds().iterator(); i.hasNext();){
+			AttendanceRecord a = i.next();
+			if(a.getStatus().equals(AttendanceRecord.ATTENDED)){
+				inAttendance++;
+				
+				//TODO: Time will be taken from the PD. For now, we are making a time based off of 5:30 of the current day
+				Calendar pretendTime = Calendar.getInstance();
+				pretendTime.set(Calendar.HOUR, 5);
+				pretendTime.set(Calendar.MINUTE, 30);
+				pretendTime.set(Calendar.SECOND, 00);
+				
+				if(a.getTime().getTime()-pretendTime.getTimeInMillis() < -1800000) numberOver30MinEarly++;
+				else if(a.getTime().getTime()-pretendTime.getTimeInMillis() < -900000) numberOver15MinEarly++;
+				else if(a.getTime().getTime()-pretendTime.getTimeInMillis() <0) numberWithin15MinEarly++;
+				else if(a.getTime().getTime()-pretendTime.getTimeInMillis() <900000) numberWithin15MinLate++;
+				else if(a.getTime().getTime()-pretendTime.getTimeInMillis() <1800000) {
+					numberWithin30MinLate++;
+					late15To30Arrivals.add(a.getTeacher().getName()+" was over 15 minutes late to "+a.getPD().getTitle()+", (but not over 30 minutes late.)");
+				}
+				else if(a.getTime().getTime()-pretendTime.getTimeInMillis() >=1800000) {
+					numberBeyond30MinLate++;
+					lateBeyond30Arrivals.add(a.getTeacher().getName()+" was over 30 minutes late to "+a.getPD().getTitle() +"!");
+				}
+			}
+			
+		}
+		double percentAttendance = ((int)(((double)inAttendance/total)*100))/100.0;
+		content+=inAttendance+" attending out of "+total+" ("+percentAttendance+"%) Of those,\n"
+				+ "    "+numberOver30MinEarly+" were over 30 minutes early\n"
+				+ "    "+numberOver15MinEarly+" were over between 30 and 15 minutes early\n"
+				+ "    "+numberWithin15MinEarly+" were within 15 minutes early\n"
+				+ "    "+numberWithin15MinLate+" were late by no more than 15 minutes\n"
+				+ "    "+numberWithin30MinLate+" were between 15 and 30 minutes late (see names below)\n"
+				+ "    "+numberBeyond30MinLate+" were at least 30 minutes late (see names below)\nLATE-COMERS:\n";
+		for(String s: late15To30Arrivals){
+			content+="  "+s+"\n";
+		}
+		content+="\n";
+		for(String s: lateBeyond30Arrivals){
+			content+="  "+s+"\n";
+		}
+		return content;
+		
+	}
+
+
+
+
 	private void setLayout(){
 		HorizontalLayout main = new HorizontalLayout();
 		m = new VerticalLayout();
@@ -464,6 +531,7 @@ public class MfAUI extends UI {
 
 			@Override
 			public void buttonClick(ClickEvent event) {
+				location = (String)locationSelect.getValue();
 				locationWindow.close();
 				prepareTable();
 				adminLayout=new VerticalLayout();
@@ -478,7 +546,7 @@ public class MfAUI extends UI {
 				
 				PD one = null;
 				for(PD a: attendanceRecords.getPDs()){
-					if(a.getLocation().equals(((String)locationSelect.getValue()))){
+					if(a.getLocation().equals(location)){
 						pds.addItem(a);
 						if(one==null)one = a;
 					}
