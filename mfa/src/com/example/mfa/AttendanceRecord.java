@@ -3,7 +3,12 @@ package com.example.mfa;
 
 import java.io.Serializable;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
+import java.util.TimeZone;
+
+import com.vaadin.server.Page;
+import com.vaadin.ui.Notification;
 
 public class AttendanceRecord implements Serializable{
 
@@ -11,6 +16,8 @@ public class AttendanceRecord implements Serializable{
 	 * 
 	 */
 	private static final long serialVersionUID = 4690838271263352606L;
+	
+	AttendanceFile file;
 	Teacher teacher;
 	PD pd;
 	String teacherName;
@@ -25,7 +32,8 @@ public class AttendanceRecord implements Serializable{
 	public static final String CANCELLED= "Cancelled";
 	
 	
-	public AttendanceRecord(Teacher t, PD p, String id, String status, Date time){
+	public AttendanceRecord(AttendanceFile file, Teacher t, PD p, String id, String status, Date time){
+		this.file = file;
 		this.teacher = t;
 		teacherName=status;
 				//t.getFirstName()+" "+t.getLastName();
@@ -35,6 +43,8 @@ public class AttendanceRecord implements Serializable{
 		this.time = time;
 	}
 
+	
+	
 	public String getDate() {
 		SimpleDateFormat format = new SimpleDateFormat("MM/dd/yy");
 		return format.format(pd.getDate());
@@ -81,7 +91,15 @@ public class AttendanceRecord implements Serializable{
 
 	public void setStatus(String status) {
 		this.status = status;
-		this.time=new Date();
+		Calendar cal = Calendar.getInstance();
+		cal.add(Calendar.HOUR, -5);
+		this.time=cal.getTime();
+		if(!file.save()){
+			Notification saveError = new Notification("Saving Error","The attendance records have not been saved");
+			saveError.setStyleName("error");
+			saveError.setDelayMsec(3000);
+			saveError.show(Page.getCurrent());
+		}
 	}
 	
 	

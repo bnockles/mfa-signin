@@ -1,6 +1,6 @@
-"First Name","Last Name","Attendance: ID","Date","Course","Workshop","Workshop Location","Status"
+"First Name","Last Name","Attendance: ID","Date","Course","Workshop","Workshop Location",Status
 "Missy","Missesalot","a0Lo0000008ytkG","2/22/2016","AP Biology","Workshop 1","M?A office, 915 Broadway"
-"Missy","Missesalot","a0Lo0000008ytkF","2/15/2016","AP Biology","Workshop 0","M?A office, 915 Broadway","Absent"
+"Missy","Missesalot","a0Lo0000008ytkF","2/15/2016","AP Biology","Workshop 0","M?A office, 915 Broadway",Absent
 "David","Studer","a0Lo0000008ylx6","2/22/2016","AP Biology","Workshop 1","M?A office, 915 Broadway"
 "Noelle","Scoca Gomez","a0Lo0000008yb19","2/22/2016","AP Biology","Workshop 1","M?A office, 915 Broadway"
 "Shubha","Sarode","a0Lo0000008wvZP","2/22/2016","AP Biology","Workshop 1","M?A office, 915 Broadway"

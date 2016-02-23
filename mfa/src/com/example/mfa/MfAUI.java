@@ -388,17 +388,19 @@ public class MfAUI extends UI {
 		fileSelectWindow = new Window("Create a new sign in sheet.");
 		VerticalLayout fields = new VerticalLayout();
 		HorizontalLayout subContent = new HorizontalLayout();
-		subContent.setMargin(true);
+//		subContent.setMargin(true);
 		subContent.setSpacing(true);
 		
-		final PasswordField pass = new PasswordField("Enter an admin password");
+		final PasswordField pass = new PasswordField("Enter an admin password (required)");
 		pass.setWidth("100%");
 		HorizontalLayout passContent = new HorizontalLayout();
 		passContent.setMargin(true);
 		passContent.setSpacing(true);
-		passContent.addComponent(pass);
-		
-		fields.addComponent(passContent);
+//		passContent.addComponent(pass);
+		passContent.setWidth("100%");
+		fields.setMargin(true);
+		fields.setSpacing(true);
+		fields.addComponent(pass);
 		fields.addComponent(subContent);
 		fileSelectWindow.setContent(fields);
 		
@@ -419,6 +421,7 @@ public class MfAUI extends UI {
 				
 
 					}catch(Exception e){
+						e.printStackTrace();
 						Notification noFileError= new Notification("Empty/Non-Existent file","Reload this page and try again.");
 						noFileError.setStyleName("error");
 						noFileError.setDelayMsec(3000);
@@ -449,7 +452,11 @@ public class MfAUI extends UI {
 
 		final NativeSelect locationSelect = new NativeSelect("Locations listed in file", locations);
 		locationSelect.setNullSelectionAllowed(false);
-		locationSelect.setValue(locations.get(0));
+		try{
+			locationSelect.setValue(locations.get(0));
+		}catch(IndexOutOfBoundsException e){
+			
+		}
 		locationSelect.setWidth("100%");
 		Button startSignIn = new Button("Start Collecting Attendance");
 		startSignIn.addClickListener(new ClickListener() {
@@ -530,7 +537,7 @@ public class MfAUI extends UI {
 					}
 					if(!alreadyCreated){
 						Teacher created = new Teacher(lastName.getValue(), firstName.getValue(),year);
-						AttendanceRecord tempRecord = new AttendanceRecord(created, (PD)pdSelect.getValue(), "UNREGISTERED", AttendanceRecord.ATTENDED, new Date());
+						AttendanceRecord tempRecord = new AttendanceRecord(attendanceRecords, created, (PD)pdSelect.getValue(), "UNREGISTERED", AttendanceRecord.ATTENDED, new Date());
 						roster.addBean(tempRecord);
 						name.select(tempRecord);
 						nameWindow.close();
