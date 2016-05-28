@@ -2,6 +2,7 @@ package com.example.mfa;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -11,20 +12,29 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
-import java.util.TimeZone;
+
 
 import com.vaadin.data.util.BeanItemContainer;
 import com.vaadin.server.VaadinService;
+import com.vaadin.ui.Button;
+import com.vaadin.ui.HorizontalLayout;
+import com.vaadin.ui.TextArea;
+import com.vaadin.ui.UI;
+import com.vaadin.ui.Button.ClickEvent;
+import com.vaadin.ui.Button.ClickListener;
+import com.vaadin.ui.Component;
 
 
 /**
  * 
  * @author bnockles
  *
- *For infomration about files, see: https://vaadin.com/docs/-/part/framework/application/application-resources.html
+ *For information about files, see: https://vaadin.com/docs/-/part/framework/application/application-resources.html
  */
 public class AttendanceFile implements Serializable{
 
@@ -36,87 +46,244 @@ public class AttendanceFile implements Serializable{
 	ArrayList<PD> loadedPDsTonight;
 	ArrayList<PD> loadedPDsPrevious;
 	ArrayList<String> locations;
-	String fileName;
+	String fileName;//TODO delete
+	File attendanceCsv;
+	private Date attendanceDate;
+	/**
+	 * SPECIAL NOTE:
+	 * Everytime an attendance record is changed, save is called
+	 * Save in turn calls update, but update potentially changes attendance records
+	 * this causes update to be called more than once
+	 * The following boolean is true only at the beginning of the update method.
+	 * If this is true, then save will not be conducted
+	 */
+	private boolean processingUpdate;
 
-	public AttendanceFile(String fileName){
-		this.fileName = fileName;
+	public final static int FIRST_INDEX = 0;
+	public final static int LAST_INDEX = 1;
+	public final static int ID_INDEX = 2;
+	public final static int DATE_INDEX = 3;
+	public final static int COURSE_INDEX = 4;
+	public final static int WORKSHOP_INDEX = 5;
+	public final static int LOCATION_INDEX = 6;
+	public final static int ATTENDANCE_INDEX = 7;
+	public final static int TIMESTAMP_INDEX = 8;
+	public final static int ATTENDANCE_CONFIRMED_INDEX = 9;
+	public final static int LATE_INDEX = 10;
+	public final static String TIMESTAMP_FORMAT = "MM/dd/yyyy kk:mm:ss a";
+	public final static int UTC_TIME_DIFFERENCE = 4;//UTC is 4 hours ahead
+	//basepath = VaadinService.getCurrent().getBaseDirectory().getAbsolutePath();  
+
+
+
+	public AttendanceFile(String saveFileName, File file, Date attendanceDate){
+		this.fileName = saveFileName;
+		this.attendanceDate = attendanceDate;
+		processingUpdate = false;
+		attendanceCsv = file;
 		allAttendanceRecords = new BeanItemContainer<AttendanceRecord>(AttendanceRecord.class);
 		loadedPDsTonight=new ArrayList<PD>();
 		loadedPDsPrevious= new ArrayList<PD>();
 		locations=new ArrayList<String>();
-		loadCSVContent(fileName);
+		try {
+			loadCSVFile(new FileReader(file));
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}  
+		String csvFile = VaadinService.getCurrent().getBaseDirectory().getAbsolutePath()+"/WEB-INF/attendance-records/"+fileName;
+		try {
+			writeFile(csvFile);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	/**a method to update potential changes to the saved file
+	 * It does this by checking every attendance record's attendanceID and finding the line in save file with the same ID. If there is a variation in the content of the lines,
+	 * the change is made to the one in memory
+	 * this syncs changes across all instances
+	 * @param fileReader
+	 */
+	private void update(FileReader fileReader, String earmarkedChange){
+		//get a "summary" of the attendance file
+		processingUpdate = true;
+		ArrayList<AttendanceFileLine> content = new ArrayList<AttendanceFileLine>();
+		String line = "";
+		BufferedReader br = new BufferedReader(fileReader);
+		try {
+			while((line = br.readLine()) != null){
+				String[] row = line.split(",(?=([^\"]*\"[^\"]*\")*[^\"]*$)", -1);//split only a comma that has an even number of quotes ahead of it
+				try{
+					AttendanceFileLine afl = new AttendanceFileLine(row[ID_INDEX].replaceAll("\"", ""), row[ATTENDANCE_INDEX].replaceAll("\"", ""), row[TIMESTAMP_INDEX].replaceAll("\"", ""));
+					content.add(afl);
+				}catch(ArrayIndexOutOfBoundsException e){
+					new ErrorMessage("Update Error","An error ocurred while updating the attendance file. \nThis happened while attempting to parse the line: \n"+Arrays.toString(row));
+				}
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		//sort the attendanceFile
+		Collections.sort(content);
+
+		Iterator<AttendanceRecord> iterator = allAttendanceRecords.getItemIds().iterator();
+		while(iterator.hasNext()){
+			AttendanceRecord current = iterator.next();
+			String currentID = current.getID();
+			//updates all attendance files except the one that is "earmarked" to be itself changed
+			if(!currentID.equals(earmarkedChange)){
+				String currentStatus = current.getStatus();
+				int matchIndex = binarySearch(content,currentID);
+				//-1 will only be returned if the save file has been replaced by a new one (an admin has started a new session)
+				if(matchIndex < 0){
+					saveChanges();//window appears notifying user that the save file has been changed and asks if they would like to download current changes
+					return;
+				}
+				//if status does not match
+				else if(!content.get(matchIndex).getAttendance().equals(currentStatus)){
+					DateFormat df = new SimpleDateFormat(TIMESTAMP_FORMAT);
+					Date d = null;
+					try {
+						//since the save file keeps dates as EST, we must convert to UTC
+						d = convertESTToUTC(df.parse(content.get(matchIndex).getDate()));
+					} catch (ParseException e) {
+						e.printStackTrace();
+					}
+					current.setStatus(content.get(matchIndex).getAttendance(), d);
+				}
+			}
+		}
+		processingUpdate = false;
+	}
+
+
+	private int binarySearch(ArrayList<AttendanceFileLine> content, String ID){
+		int lo = 0;
+		int hi = content.size()- 1;
+		while (lo <= hi) {
+			// Key is in a[lo..hi] or not present.
+			int mid = lo + (hi - lo) / 2;
+			if      (ID.compareTo(content.get(mid).getID())< 0) hi = mid - 1;
+			else if (ID.compareTo(content.get(mid).getID())> 0) lo = mid + 1;
+			else return mid;
+		}
+		return -1;
 
 	}
 
-	public void loadCSVContent(String fileName){
-		String basepath = VaadinService.getCurrent().getBaseDirectory().getAbsolutePath();  
-		String csvFile = basepath+"/WEB-INF/attendance-records/"+fileName;
+
+	private void saveChanges() {
+		final TextWindow saveChanges = new TextWindow("Save Changes","60%","50%","The attendance file that this "
+				+ "app instance had been saving data to has been replaced (most likely because an "
+				+ "admin wanted to start a new session.) Therefore, this app instance has expired. "
+				+ "If you have not already downloaded the attendance file associated with this app instance,"
+				+ " you can do so now.");
+		saveChanges.setWordwrap(true);
+		HorizontalLayout hl = new HorizontalLayout();
+
+
+		hl.addComponent(generateContent());
+		Button close = new Button("close");
+		close.addClickListener(new ClickListener() {
+
+			/**
+			 * 
+			 */
+			private static final long serialVersionUID = -1385584475447768719L;
+
+			@Override
+			public void buttonClick(ClickEvent event) {
+				saveChanges.close();
+			}
+		});
+		hl.addComponent(close);
+		saveChanges.addFeature(hl);
+		UI.getCurrent().addWindow(saveChanges);
+	}
+
+	private Component generateContent() {
+		String content ="FirstName,Last Name,Record ID,Date,PD,Workshop,Location,Status,Timestamp,Confirmed Absence, Late,\n";
+		Iterator<AttendanceRecord> iter= iterator();
+		while(iter.hasNext()){		
+			AttendanceRecord e = iter.next();
+			content+="\""+e.getFirstName()+"\",\""+e.getLastName()+"\",\""+e.getID()+"\",\""+e.getPd().getDateString()+"\",\""+e.getPd().getTitle()+"\",\"Workshop "+e.getPd().getWorkshop()+"\",\""+e.getPd().getLocation()+"\",\""+e.getStatus()+","+e.getTime()+"\n";
+		}
+
+		TextArea area = new TextArea();
+		area.setSizeFull();
+		area.setValue(content);
+
+		return area;
+	}
+
+	public void loadCSVFile(FileReader fileReader){
 		BufferedReader br = null;
 		String line = "";
-		String cvsSplitBy = "\",\"";
+		int foundContent = 0;
 
 		try {
 
-			br = new BufferedReader(new FileReader(csvFile));
+			br = new BufferedReader(fileReader);
 			while ((line = br.readLine()) != null) {
 
 
 				try{
-					String[] row = line.split(cvsSplitBy);
+					String[] row = line.split(",(?=([^\"]*\"[^\"]*\")*[^\"]*$)", -1);//split only a comma that has an even number of quotes ahead of it
+					//					System.out.print("Loaded a line: ");
+					//					for(String s: row){
+					//						System.out.print(s+" --- ");
+					//					}
+					//					System.out.println("");
 
-//					System.out.print("Loaded a line: ");
-//					for(String s: row){
-//						System.out.print(s+" --- ");
-//					}
-//					System.out.println("");
-					
 					//parse the date from this entry
-					DateFormat format = new SimpleDateFormat("M/dd/yy");
+					DateFormat format = new SimpleDateFormat("MM/dd/yy");
 					Date date ;
 					try{
-						date = format.parse(row[3].replaceAll("\"", ""));
+						date = format.parse(row[DATE_INDEX].replaceAll("\"", ""));
 					}catch (ParseException e) {
 						try{
-							DateFormat format2 = new SimpleDateFormat("MM/dd/yy");
-							date = format2.parse(row[3].replaceAll("\"", ""));
+							DateFormat format2 = new SimpleDateFormat("M/dd/yy");
+							date = format2.parse(row[DATE_INDEX].replaceAll("\"", ""));
 						}catch (ParseException e2) {
 							try{
 								DateFormat format3 = new SimpleDateFormat("M/d/yy");
-								date = format3.parse(row[3].replaceAll("\"", ""));
+								date = format3.parse(row[DATE_INDEX].replaceAll("\"", ""));
 							}catch (ParseException e3) {
 								try{
 									DateFormat format4 = new SimpleDateFormat("MM/d/yy");
-									date = format4.parse(row[3].replaceAll("\"", ""));
+									date = format4.parse(row[DATE_INDEX].replaceAll("\"", ""));
 								}catch (ParseException e4) {
 									date = new Date();
 								}
 							}
 						}
 					}
+					date = convertESTToUTC(date);
+					
 					
 					//Start by checking whether or not the PD has already been loaded
-					PD pd = new PD(row[4].replaceAll("\"", ""), Integer.parseInt(row[5].replace("Workshop ","").replace("\"", "")), new BeanItemContainer<AttendanceRecord>(AttendanceRecord.class), date, row[6].replaceAll("\"", ""));
+					PD pd = new PD(row[COURSE_INDEX].replaceAll("\"", ""), Integer.parseInt(row[WORKSHOP_INDEX].replace("Workshop ","").replace("\"", "")), new BeanItemContainer<AttendanceRecord>(AttendanceRecord.class), date, row[LOCATION_INDEX].replaceAll("\"", ""));
 					PD alreadyLoaded=pd;
 					boolean wasLoaded = false;
 					for(PD p: loadedPDsTonight){
 						if(pd.equals(p)){
 							alreadyLoaded=p;
 							wasLoaded=true;
+							break;
 						}
 					}
 					if(!wasLoaded){
-						Calendar calendar = Calendar.getInstance();
-						calendar.add(Calendar.HOUR,-5);
 						SimpleDateFormat dayOnly = new SimpleDateFormat("MM/dd/yy");
-						
-						Date today = dayOnly.parse(dayOnly.format(calendar.getTime()));
+						Date today = dayOnly.parse(dayOnly.format(attendanceDate));
+						Calendar calendar = Calendar.getInstance();
+						calendar.setTime(attendanceDate);
 						calendar.add(Calendar.DAY_OF_YEAR, 1);  
 						Date tomorrow = calendar.getTime();
-						
-						//TODO: When finishing the Google demo, this part must be cut out, or the demo file will not work
+
 						if(pd.getDate().before(today)){
 							loadedPDsPrevious.add(pd);
-							
 						}
 						else if(pd.getDate().before(tomorrow))loadedPDsTonight.add(pd);
 					}
@@ -132,27 +299,46 @@ public class AttendanceFile implements Serializable{
 						locations.add(location);
 					}
 
-					//TODO: tell Miriam to include attendance status in report
 					String status = AttendanceRecord.ABSENT;
-					DateFormat df = new SimpleDateFormat("E MMM dd kk:mm:ss z yyyy");
+					DateFormat df = new SimpleDateFormat(TIMESTAMP_FORMAT);
 					Date timeStamp = null;
 					try{
-						status=row[7].replaceAll("\"", "");
-						String stamp = row[8].replaceAll("\"", "");
-						timeStamp=df.parse(stamp);
+						status=row[ATTENDANCE_INDEX].replaceAll("\"", "");
+						String stamp = row[TIMESTAMP_INDEX].replaceAll("\"", "");
+						timeStamp=convertESTToUTC(df.parse(stamp));						
 					}catch(ArrayIndexOutOfBoundsException e){
 						//will always throw error unless format of csv is changed to include status
 					}catch(ParseException e){
 						//will be thrown unless record contains a valid date
+					}catch(NumberFormatException e){
+						//thrown when int is parsed from the "Workshop" header
 					}
-					
-					AttendanceRecord thisRecord = new AttendanceRecord(this, new Teacher(row[1].replaceAll("\"", ""),row[0].replaceAll("\"", ""),0),alreadyLoaded,row[2].replaceAll("\"", ""),status,timeStamp);
+					boolean confirmedAbsence = true;
+					if(status.equals(AttendanceRecord.ABSENT) || status.equals("")){
+						try{
+							confirmedAbsence = parseOneOrZero(row[ATTENDANCE_CONFIRMED_INDEX]);
+						}catch(Exception e){
+							confirmedAbsence = false;
+						}
+
+					}
+					boolean late = false;
+					if(status.equals(AttendanceRecord.ATTENDED)){
+						try{
+							late = parseOneOrZero(row[LATE_INDEX]);
+						}catch(Exception e){
+						}
+					}
+
+					AttendanceRecord thisRecord = new AttendanceRecord(this, new Teacher(row[LAST_INDEX].replaceAll("\"", ""),row[FIRST_INDEX].replaceAll("\"", ""),0),alreadyLoaded,row[ID_INDEX].replaceAll("\"", ""),status,timeStamp, confirmedAbsence, late);
 					allAttendanceRecords.addItem(thisRecord);
 					//add the record to the PD as well
 					alreadyLoaded.addRecord(thisRecord);				
+					foundContent++;
 
 				}catch(ArrayIndexOutOfBoundsException e){
 					//this exception is thrown at the end of the document, which contains document information
+					e.printStackTrace();
 				}catch(Exception e){
 					//this exception is thrown aduring the first line, since it is the header row
 					e.printStackTrace();
@@ -169,12 +355,28 @@ public class AttendanceFile implements Serializable{
 			if (br != null) {
 				try {
 					br.close();
+					if(foundContent<=1)new ErrorMessage("Loading Error","There is no content in the selected file or no file was loaded. You should reload this page.");
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
 			}
 		}
+	}
 
+
+
+	public static Date convertESTToUTC(Date date) {
+		Calendar cal = Calendar.getInstance();
+	    cal.setTime(date);
+	    cal.add(Calendar.HOUR_OF_DAY, UTC_TIME_DIFFERENCE);
+	    return cal.getTime();
+	}
+	
+	public static Date converUTCToEST(Date date) {
+		Calendar cal = Calendar.getInstance();
+	    cal.setTime(date);
+	    cal.add(Calendar.HOUR_OF_DAY, -UTC_TIME_DIFFERENCE);
+	    return cal.getTime();
 	}
 
 	public BeanItemContainer<AttendanceRecord> getRecords(){
@@ -184,7 +386,7 @@ public class AttendanceFile implements Serializable{
 	public ArrayList<PD> getPDs(){
 		return loadedPDsTonight;
 	}
-	
+
 	public ArrayList<PD> getPreviousPDs(){
 		return loadedPDsPrevious;
 	}
@@ -193,41 +395,73 @@ public class AttendanceFile implements Serializable{
 		return locations;
 	}
 
-	public boolean save(){
-		String basepath = VaadinService.getCurrent().getBaseDirectory().getAbsolutePath();  
-		String csvFile = basepath+"/WEB-INF/attendance-records/"+fileName;
-		 try {
-	            // Assume default encoding.
-	            FileWriter fileWriter = new FileWriter(csvFile);
-	            // Always wrap FileWriter in BufferedWriter.
-	            BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
+	/**
+	 * write all current content into save file
+	 * @param csvFile
+	 * @throws IOException
+	 */
+	public void writeFile(String csvFile) throws IOException{
+		FileWriter fileWriter = new FileWriter(csvFile);
+		// Always wrap FileWriter in BufferedWriter.
+		BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
 
-	            // Note that write() does not automatically
-	            // append a newline character.
-	            bufferedWriter.write("\"First Name\",\"Last Name\",\"Attendance: ID\",\"Date\",\"Course\",\"Workshop\",\"Workshop Location\",Status,Timestamp\n");
-	            for(Iterator<AttendanceRecord> i = allAttendanceRecords.getItemIds().iterator(); i.hasNext();){
-	            	AttendanceRecord a = (AttendanceRecord)i.next();
-	            	bufferedWriter.write("\""+a.getTeacher().getFirstName()+"\","
-	            			+ "\""+a.getTeacher().getLastName()+"\","
-	            			+ "\""+a.getID()+"\","
-	            			+ "\""+a.getPD().getDateString()+"\","
-	            			+ "\""+a.getPD().getTitle()+"\","
-	            			+ "\"Workshop "+a.getPD().getWorkshop()+"\","
-	            			+ "\""+a.getPD().getLocation()+"\","
-	            			+ "\""+a.getStatus()+"\",");
-	            	if(a.getStatus().equals(AttendanceRecord.ATTENDED)) bufferedWriter.write("\""+a.getTime()+"\"\n");
-	            	else bufferedWriter.write("\"-\"\n");
-	            }
+		// Note that write() does not automatically
+		// append a newline character.
+		bufferedWriter.write("\"First Name\",\"Last Name\",\"Attendance: ID\",\"Date\",\"Course\",\"Workshop\",\"Workshop Location\",Status,Timestamp,Confirmed Absence, Late,\n");
+		for(Iterator<AttendanceRecord> i = allAttendanceRecords.getItemIds().iterator(); i.hasNext();){
+			AttendanceRecord a = (AttendanceRecord)i.next();
+			bufferedWriter.write("\""+a.getTeacher().getFirstName()+"\","
+					+ "\""+a.getTeacher().getLastName()+"\","
+					+ "\""+a.getID()+"\","
+					+ "\""+a.getPd().getDateString()+"\","
+					+ "\""+a.getPd().getTitle()+"\","
+					+ "\"Workshop "+a.getPd().getWorkshop()+"\","
+					+ "\""+a.getPd().getLocation()+"\","
+					+ "\""+a.getStatus()+"\",");
+			if(a.getStatus().equals(AttendanceRecord.ATTENDED)) bufferedWriter.write("\""+a.getFormattedTime()+"\"");
+			else bufferedWriter.write("\"-\"");
+			
+			bufferedWriter.write(","+oneOrZero(a.confirmedAbsence())+","+oneOrZero(a.wasLate())+",\n");
+			
+		}
 
-	            // Always close files.
-	            bufferedWriter.close();
-	            return true;
-	        }
-	        catch(IOException ex) {
-
-	            ex.printStackTrace();
-	            return false;
-	        }
+		// Always close files.
+		bufferedWriter.close();
 	}
 	
+	public static boolean parseOneOrZero(String s){
+		if(s.equals("1"))return true;
+		return false;
+	}
+	
+	public static String oneOrZero(boolean b){
+		if(b)return "1";
+		return "0";
+	}
+
+	public boolean save(String earmarkedChange){
+		String csvFile = VaadinService.getCurrent().getBaseDirectory().getAbsolutePath()+"/WEB-INF/attendance-records/"+fileName;
+
+		try {
+			if(!processingUpdate){
+				update(new FileReader(csvFile), earmarkedChange);
+				writeFile(csvFile);
+			}
+			return true;
+		}
+		catch(IOException ex) {
+
+			ex.printStackTrace();
+			return false;
+		}
+	}
+
+	public Iterator<AttendanceRecord> iterator() {
+		return allAttendanceRecords.getItemIds().iterator();
+	}
+
+	public File getFile() {
+		return attendanceCsv;
+	}
+
 }
