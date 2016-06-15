@@ -10,11 +10,13 @@ public class AttendanceFileLine implements Comparable<AttendanceFileLine> {
 	String ID;
 	String attendance;
 	String date;
+	String confirmedAbsence;
 	
-	public AttendanceFileLine(String ID, String attendance, String date) {
+	public AttendanceFileLine(String ID, String attendance, String date, String confirmedAbsence) {
 		this.ID = ID;
 		this.attendance = attendance;
 		this.date = date;
+		this.confirmedAbsence = confirmedAbsence;
 	}
 	
 
@@ -28,6 +30,10 @@ public class AttendanceFileLine implements Comparable<AttendanceFileLine> {
 	}
 
 
+	public String isConfirmed(){
+		return confirmedAbsence;
+	}
+	
 	@Override
 	public int compareTo(AttendanceFileLine o) {
 		return this.ID.compareTo(o.getID());

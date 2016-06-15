@@ -1026,6 +1026,7 @@ public class MfAUI extends UI {
 						boolean alreadyListed = false;
 						for(Object l:table.getItemIds()){
 							AttendanceRecord le = (AttendanceRecord)l;
+							//this assumes there is only one record under that person's name, because people should not register for more than one
 							if(le.equals((AttendanceRecord)(name.getValue()))){
 								alreadyListed=true;
 								if(le.getStatus().equals(AttendanceRecord.ATTENDED)){
@@ -1041,6 +1042,7 @@ public class MfAUI extends UI {
 									table.refreshRowCache();
 									//iterate through previous PDs to see if participant has attended each one
 									boolean absentRecordFound = false;
+									ArrayList<Date> previousAbsences = new ArrayList<Date>();
 									for(PD previous : attendanceRecords.getPreviousPDs()){
 										if(previous.getTitle().equals(((PD)pdSelect.getValue()).getTitle())){
 											//iterate through all attendance records within this PD to find the one matching this participant
@@ -1054,19 +1056,22 @@ public class MfAUI extends UI {
 														a.getStatus().equals(AttendanceRecord.ABSENT) &&
 														!a.confirmedAbsence()){
 													absentRecordFound=true;
-													notifyAbsence(previous.getDate());
+													previousAbsences.add(previous.getDate());
 													a.setConfirmedAbsence(true);
 												}
 											}
 
 										}
 									}
-									if(!absentRecordFound){
+									if(absentRecordFound){
+										notifyAbsence(previousAbsences);
+									}else{
 										Notification success = new Notification("Success!",le.getFirstName()+", you are checked in for "+le.getPd().getTitle()+".");
 										success.setDelayMsec(3000);
 										success.show(Page.getCurrent());
 										name.setValue(null);//if the teacher has a prior absences, the name is not reset until AFTER they write their reasoning
 									}
+									break;//breaks loop that looks for name within list of tonight's PDs
 								}
 							}
 						}
@@ -1199,14 +1204,30 @@ public class MfAUI extends UI {
 		//		});
 	}
 
-	private void notifyAbsence(final Date date) {
+	private void notifyAbsence(final ArrayList<Date> dates) {
 		final SimpleDateFormat format = new SimpleDateFormat("MM/dd/yy");
 		explainAbsence = new Window();
 		VerticalLayout l = new VerticalLayout();
 		l.setMargin(true);
 		final HorizontalLayout buttonRow = new HorizontalLayout();
 		explainAbsence.setContent(l);
-		final TextArea disclaimer = new TextArea("Looks like you missed a session!","You have been checked in for this evening's PD but our records show you have missed a previous PD in this series. The PD was on "+format.format(date)+".");
+		
+		String whatWasMissed = "a session";
+		String thingMissed = "a previos PD";
+		String thingProper = "The PD was";
+		String dateListBuilder = format.format(dates.get(0));
+		for(int i = 1; i < dates.size(); i++){
+			if(i == dates.size()-1)dateListBuilder+=" and "+format.format(dates.get(i));
+			else dateListBuilder+=", "+format.format(dates.get(i));
+		}
+		final String dateList = dateListBuilder;
+		if(dates.size()>1){
+			whatWasMissed = "some sessions";
+			thingMissed = "some previos PDs";
+			thingProper= "The PDs were";
+		}
+		
+		final TextArea disclaimer = new TextArea("Looks like you missed "+whatWasMissed+"!","You have been checked in for this evening's PD but our records show you have missed "+thingMissed+" in this series. "+thingProper+" on "+dateList+".");
 		disclaimer.setWidth("100%");
 		disclaimer.setReadOnly(true);
 
@@ -1224,7 +1245,7 @@ public class MfAUI extends UI {
 			@Override
 			public void buttonClick(ClickEvent event) {
 				explainAbsence.close();
-				addNote(((AttendanceRecord)name.getValue()).getTeacher().getName()+" confirmed his/her absence on "+format.format(date));
+				addNote(((AttendanceRecord)name.getValue()).getTeacher().getName()+" confirmed his/her absence on "+dateList);
 				Notification thanks = new Notification("Thank you!","We just wanted to make sure our records were correct.");
 				thanks.setDelayMsec(3000);
 				thanks.show(Page.getCurrent());
@@ -1236,7 +1257,7 @@ public class MfAUI extends UI {
 
 			@Override
 			public void buttonClick(ClickEvent event) {
-				explainingButtonAction(buttonRow, disclaimer, "Is there any reason why you didn't sign in?"," claimed they were not absent on "+format.format(date)+". ");
+				explainingButtonAction(buttonRow, disclaimer, "Is there any reason why you didn't sign in?"," claimed they were not absent on "+dateList+". ");
 			}
 		});
 
@@ -1244,7 +1265,7 @@ public class MfAUI extends UI {
 
 			@Override
 			public void buttonClick(ClickEvent event) {
-				explainingButtonAction(buttonRow, disclaimer, "Is there a reason why you were unable to make it?"," wrote a note explaining their "+format.format(date)+" absence.");
+				explainingButtonAction(buttonRow, disclaimer, "Is there a reason why you were unable to make it?"," wrote a note explaining their "+dateList+" absence(s).");
 			}
 		});
 

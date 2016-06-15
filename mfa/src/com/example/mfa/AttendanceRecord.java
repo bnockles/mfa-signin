@@ -94,6 +94,10 @@ public class AttendanceRecord implements Serializable{
 		return confirmedAbsence;
 	}
 	
+	public String confirmedAbsenceAsString(){
+		return (confirmedAbsence)?"1":"0";
+	}
+	
 	public void setConfirmedAbsence(boolean b){
 		confirmedAbsence = b;
 		file.save(this.identifier);
@@ -167,6 +171,12 @@ public class AttendanceRecord implements Serializable{
 			saveError.setDelayMsec(3000);
 			saveError.show(Page.getCurrent());
 		}
+	}
+
+
+
+	public void setConfirmedAbsenceFromString(String confirmed) {
+		confirmedAbsence=(confirmed.equals("1"))?true:false;
 	}
 
 

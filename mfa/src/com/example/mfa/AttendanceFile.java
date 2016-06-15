@@ -115,7 +115,7 @@ public class AttendanceFile implements Serializable{
 			while((line = br.readLine()) != null){
 				String[] row = line.split(",(?=([^\"]*\"[^\"]*\")*[^\"]*$)", -1);//split only a comma that has an even number of quotes ahead of it
 				try{
-					AttendanceFileLine afl = new AttendanceFileLine(row[ID_INDEX].replaceAll("\"", ""), row[ATTENDANCE_INDEX].replaceAll("\"", ""), row[TIMESTAMP_INDEX].replaceAll("\"", ""));
+					AttendanceFileLine afl = new AttendanceFileLine(row[ID_INDEX].replaceAll("\"", ""), row[ATTENDANCE_INDEX].replaceAll("\"", ""), row[TIMESTAMP_INDEX].replaceAll("\"", ""), row[ATTENDANCE_CONFIRMED_INDEX]);
 					content.add(afl);
 				}catch(ArrayIndexOutOfBoundsException e){
 					new ErrorMessage("Update Error","An error ocurred while updating the attendance file. \nThis happened while attempting to parse the line: \n"+Arrays.toString(row));
@@ -133,8 +133,15 @@ public class AttendanceFile implements Serializable{
 			AttendanceRecord current = iterator.next();
 			String currentID = current.getID();
 			//updates all attendance files except the one that is "earmarked" to be itself changed
+			//For example, Joe signed in on a different IPad, Sue signed in on this one
+			//When this iPad updates, it does not have a record of Joe
+
+			//1)It finds Joes's record on Sue's iPad
 			if(!currentID.equals(earmarkedChange)){
+				//2)it recognizes that, according to this iPad, Joes is not checked in
 				String currentStatus = current.getStatus();
+				String confirmedAbsence = current.confirmedAbsenceAsString();
+				//3) It finds Joe's record on the save file
 				int matchIndex = binarySearch(content,currentID);
 				//-1 will only be returned if the save file has been replaced by a new one (an admin has started a new session)
 				if(matchIndex < 0){
@@ -142,16 +149,22 @@ public class AttendanceFile implements Serializable{
 					return;
 				}
 				//if status does not match
+				//4) It identifies that the save file has a different status (present) than Sue has
 				else if(!content.get(matchIndex).getAttendance().equals(currentStatus)){
 					DateFormat df = new SimpleDateFormat(TIMESTAMP_FORMAT);
 					Date d = null;
 					try {
 						//since the save file keeps dates as EST, we must convert to UTC
+						//5) It convert's Joe's timestamp to UTC 
 						d = convertESTToUTC(df.parse(content.get(matchIndex).getDate()));
 					} catch (ParseException e) {
 						e.printStackTrace();
 					}
+					//6) On Sue's iPad it updates with Joe's status
 					current.setStatus(content.get(matchIndex).getAttendance(), d);
+				}else if(!content.get(matchIndex).isConfirmed().equals(confirmedAbsence)){
+					//7) checks if an attendance record has its absence confirmed
+					current.setConfirmedAbsenceFromString(content.get(matchIndex).isConfirmed());
 				}
 			}
 		}
@@ -261,8 +274,8 @@ public class AttendanceFile implements Serializable{
 						}
 					}
 					date = convertESTToUTC(date);
-					
-					
+
+
 					//Start by checking whether or not the PD has already been loaded
 					PD pd = new PD(row[COURSE_INDEX].replaceAll("\"", ""), Integer.parseInt(row[WORKSHOP_INDEX].replace("Workshop ","").replace("\"", "")), new BeanItemContainer<AttendanceRecord>(AttendanceRecord.class), date, row[LOCATION_INDEX].replaceAll("\"", ""));
 					PD alreadyLoaded=pd;
@@ -367,16 +380,16 @@ public class AttendanceFile implements Serializable{
 
 	public static Date convertESTToUTC(Date date) {
 		Calendar cal = Calendar.getInstance();
-	    cal.setTime(date);
-	    cal.add(Calendar.HOUR_OF_DAY, UTC_TIME_DIFFERENCE);
-	    return cal.getTime();
+		cal.setTime(date);
+		cal.add(Calendar.HOUR_OF_DAY, UTC_TIME_DIFFERENCE);
+		return cal.getTime();
 	}
-	
+
 	public static Date converUTCToEST(Date date) {
 		Calendar cal = Calendar.getInstance();
-	    cal.setTime(date);
-	    cal.add(Calendar.HOUR_OF_DAY, -UTC_TIME_DIFFERENCE);
-	    return cal.getTime();
+		cal.setTime(date);
+		cal.add(Calendar.HOUR_OF_DAY, -UTC_TIME_DIFFERENCE);
+		return cal.getTime();
 	}
 
 	public BeanItemContainer<AttendanceRecord> getRecords(){
@@ -400,7 +413,7 @@ public class AttendanceFile implements Serializable{
 	 * @param csvFile
 	 * @throws IOException
 	 */
-	public void writeFile(String csvFile) throws IOException{
+	private void writeFile(String csvFile) throws IOException{
 		FileWriter fileWriter = new FileWriter(csvFile);
 		// Always wrap FileWriter in BufferedWriter.
 		BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
@@ -420,37 +433,39 @@ public class AttendanceFile implements Serializable{
 					+ "\""+a.getStatus()+"\",");
 			if(a.getStatus().equals(AttendanceRecord.ATTENDED)) bufferedWriter.write("\""+a.getFormattedTime()+"\"");
 			else bufferedWriter.write("\"-\"");
-			
+
 			bufferedWriter.write(","+oneOrZero(a.confirmedAbsence())+","+oneOrZero(a.wasLate())+",\n");
-			
+
 		}
 
 		// Always close files.
 		bufferedWriter.close();
 	}
-	
+
 	public static boolean parseOneOrZero(String s){
 		if(s.equals("1"))return true;
 		return false;
 	}
-	
+
 	public static String oneOrZero(boolean b){
 		if(b)return "1";
 		return "0";
 	}
 
-	public boolean save(String earmarkedChange){
+	//Making this method synchronized means it can only be called by one thread at a time. This removes possibility of overriding data while 
+	//it is being read on another iPad
+	public synchronized boolean save(String earmarkedChange){
 		String csvFile = VaadinService.getCurrent().getBaseDirectory().getAbsolutePath()+"/WEB-INF/attendance-records/"+fileName;
 
 		try {
 			if(!processingUpdate){
 				update(new FileReader(csvFile), earmarkedChange);
-				writeFile(csvFile);
+				writeFile(csvFile);					
+
 			}
 			return true;
 		}
 		catch(IOException ex) {
-
 			ex.printStackTrace();
 			return false;
 		}
